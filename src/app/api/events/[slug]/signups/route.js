@@ -44,8 +44,13 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  sendHostSignupNotification({ event, item, signup }).catch(() => {});
-  sendGuestSignupConfirmation({ event, item, signup }).catch(() => {});
+  // Awaited (not fire-and-forget): on Vercel, a serverless function can freeze
+  // as soon as the response is returned, which silently kills any unawaited
+  // async work (like these email sends) before it ever reaches the network.
+  await Promise.allSettled([
+    sendHostSignupNotification({ event, item, signup }),
+    sendGuestSignupConfirmation({ event, item, signup }),
+  ]);
 
   return NextResponse.json({ signup });
 }
