@@ -47,10 +47,20 @@ export async function POST(req, { params }) {
   // Awaited (not fire-and-forget): on Vercel, a serverless function can freeze
   // as soon as the response is returned, which silently kills any unawaited
   // async work (like these email sends) before it ever reaches the network.
-  await Promise.allSettled([
-    sendHostSignupNotification({ event, item, signup }),
-    sendGuestSignupConfirmation({ event, item, signup }),
-  ]);
+  // Sent one after another (not concurrently) to avoid tripping Resend's
+  // per-second rate limit, which would otherwise silently drop the second
+  // send. Each helper logs its own failure, so a problem with one email
+  // never blocks or hides a problem with the other.
+  try {
+    await sendHostSignupNotification({ event, item, signup });
+  } catch (e) {
+    console.error("[email] sendHostSignupNotification threw:", e);
+  }
+  try {
+    await sendGuestSignupConfirmation({ event, item, signup });
+  } catch (e) {
+    console.error("[email] sendGuestSignupConfirmation threw:", e);
+  }
 
   return NextResponse.json({ signup });
 }
