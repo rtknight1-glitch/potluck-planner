@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 const EMOJIS = ["🍲", "🎉", "🍂", "🎄", "🌻", "🏖️", "🍁", "🎃", "🥧", "🍕", "🎂", "⭐"];
 const COLORS = ["#e07a3f", "#3f7de0", "#4caf6b", "#c2447b", "#7a5cd6", "#d6a33f"];
 
-export default function AdminClient({ event, items, signups, token, isNew }) {
+export default function AdminClient({ event, items, signups, token, isNew, isDuplicated }) {
   const router = useRouter();
   const [form, setForm] = useState({
     title: event.title,
@@ -28,6 +28,7 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
     Object.fromEntries(items.map((it) => [it.id, it.needed_qty ?? ""]))
   );
   const [error, setError] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
   const publicUrl = `${siteUrl}/e/${event.slug}`;
@@ -98,6 +99,24 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
     navigator.clipboard.writeText(text);
   }
 
+  async function duplicateEvent() {
+    setDuplicating(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/events/${event.slug}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not duplicate this event");
+      router.push(`/admin/${data.slug}?token=${data.adminToken}&new=1&duplicated=1`);
+    } catch (err) {
+      setError(err.message);
+      setDuplicating(false);
+    }
+  }
+
   const signupsByItem = {};
   for (const s of signups) {
     if (s.item_id) (signupsByItem[s.item_id] = signupsByItem[s.item_id] || []).push(s);
@@ -116,10 +135,17 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
         </div>
       </div>
 
-      {isNew && (
+      {isNew && !isDuplicated && (
         <div className="success-box">
           Your potluck page is live! Share the public link below with guests. Bookmark this admin
           page too — it's the only way back in.
+        </div>
+      )}
+
+      {isDuplicated && (
+        <div className="success-box">
+          This is a fresh copy — same items and settings, no sign-ups carried over. Update the date,
+          time, and location below, then share the new link.
         </div>
       )}
 
@@ -136,6 +162,18 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
         <span style={{ flex: 1 }}>{adminUrl}</span>
         <button className="btn small secondary" onClick={() => copy(adminUrl)}>
           Copy
+        </button>
+      </div>
+
+      <div className="section-title">Reuse this event</div>
+      <div className="card">
+        <p className="helper" style={{ marginBottom: 10 }}>
+          Create a fresh copy of this event with the same theme, look, and items — no sign-ups carried
+          over. Handy for a recurring get-together; just update the date, time, and location on the
+          new page.
+        </p>
+        <button className="btn secondary" onClick={duplicateEvent} disabled={duplicating}>
+          {duplicating ? "Duplicating..." : "Duplicate this event"}
         </button>
       </div>
 
