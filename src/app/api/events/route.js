@@ -78,7 +78,8 @@ export async function POST(req) {
     }
   }
 
-  sendEventCreatedEmail({ event }).catch(() => {});
+  // Awaited so Vercel doesn't freeze the function before the send completes.
+  await sendEventCreatedEmail({ event }).catch(() => {});
 
   return NextResponse.json({ slug: event.slug, adminToken: event.admin_token });
 }
