@@ -18,6 +18,10 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [newItem, setNewItem] = useState("");
+  const [newItemQty, setNewItemQty] = useState("");
+  const [itemQty, setItemQty] = useState(() =>
+    Object.fromEntries(items.map((it) => [it.id, it.needed_qty ?? ""]))
+  );
   const [error, setError] = useState("");
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -60,10 +64,11 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
     const res = await fetch(`/api/events/${event.slug}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, name }),
+      body: JSON.stringify({ token, name, neededQty: newItemQty ? Number(newItemQty) : null }),
     });
     if (res.ok) {
       setNewItem("");
+      setNewItemQty("");
       router.refresh();
     }
   }
@@ -71,6 +76,16 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
   async function removeItem(itemId) {
     if (!confirm("Remove this item? Any sign-ups for it will also be removed.")) return;
     await fetch(`/api/events/${event.slug}/items/${itemId}?token=${token}`, { method: "DELETE" });
+    router.refresh();
+  }
+
+  async function saveItemQty(itemId) {
+    const value = itemQty[itemId];
+    await fetch(`/api/events/${event.slug}/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, neededQty: value === "" ? null : Number(value) }),
+    });
     router.refresh();
   }
 
@@ -84,10 +99,17 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
   }
 
   return (
-    <div className="wrap">
-      <div className="banner">{event.banner_emoji}</div>
-      <h1>{event.title}</h1>
-      <p className="subtitle">Host admin page — keep this link private, it's how you manage your event.</p>
+    <div className="wrap" style={{ "--primary": event.primary_color }}>
+      <div className="hero-card">
+        <div className="hero-banner">{event.banner_emoji}</div>
+        <h1>{event.title}</h1>
+        <p className="subtitle">Host admin page — keep this link private, it's how you manage your event.</p>
+        <div className="hero-pills">
+          <span className="pill">📅 {event.event_date}</span>
+          {event.event_time && <span className="pill">⏰ {event.event_time}</span>}
+          {event.location && <span className="pill">📍 {event.location}</span>}
+        </div>
+      </div>
 
       {isNew && (
         <div className="success-box">
@@ -132,7 +154,12 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
           </div>
           <div>
             <label>Time</label>
-            <input type="time" value={form.event_time} onChange={(e) => set("event_time", e.target.value)} />
+            <input
+              type="text"
+              value={form.event_time}
+              onChange={(e) => set("event_time", e.target.value)}
+              placeholder="e.g. 5:30 PM"
+            />
           </div>
         </div>
 
@@ -167,29 +194,63 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
       </button>
 
       <div className="section-title">Items</div>
-      <div className="card">
-        {items.map((item) => (
-          <div key={item.id} className="item-row">
+      <p className="helper" style={{ marginBottom: 10 }}>
+        Set "needed" to have an item grey out once enough people have claimed it. Leave blank for no limit.
+      </p>
+      {items.map((item) => {
+        const totalQty = (signupsByItem[item.id] || []).reduce((sum, s) => sum + (s.quantity || 1), 0);
+        const needed = item.needed_qty;
+        const fulfilled = needed != null && totalQty >= needed;
+        return (
+          <div key={item.id} className={`item-card${fulfilled ? " fulfilled" : ""}`}>
             <div>
-              <div className="item-name">{item.name}</div>
-              {(signupsByItem[item.id] || []).map((s) => (
-                <span key={s.id} className="claim">
-                  {s.guest_name} ({s.quantity}x)
-                </span>
-              ))}
+              <div className="item-card-name">{item.name}</div>
+              <div className="item-card-claims">
+                {(signupsByItem[item.id] || []).map((s) => (
+                  <span key={s.id} className="claim-chip">
+                    {s.guest_name} ({s.quantity}x)
+                  </span>
+                ))}
+                {!(signupsByItem[item.id] || []).length && <span className="helper">No claims yet</span>}
+              </div>
             </div>
-            <button className="btn small danger" onClick={() => removeItem(item.id)}>
-              Remove
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="number"
+                min="1"
+                value={itemQty[item.id] ?? ""}
+                onChange={(e) => setItemQty((q) => ({ ...q, [item.id]: e.target.value }))}
+                onBlur={() => saveItemQty(item.id)}
+                placeholder="Needed"
+                style={{ width: 72 }}
+              />
+              <span className={`qty-badge${fulfilled ? " fulfilled-badge" : ""}`}>
+                {totalQty}
+                {needed ? `/${needed}` : ""}
+              </span>
+              <button className="btn small danger" onClick={() => removeItem(item.id)}>
+                Remove
+              </button>
+            </div>
           </div>
-        ))}
-        <div className="row" style={{ marginTop: 10 }}>
+        );
+      })}
+      <div className="card">
+        <div className="row">
           <input
             type="text"
             value={newItem}
             onChange={(e) => setNewItem(e.target.value)}
             placeholder="Add an item"
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addItem())}
+          />
+          <input
+            type="number"
+            min="1"
+            value={newItemQty}
+            onChange={(e) => setNewItemQty(e.target.value)}
+            placeholder="Needed"
+            style={{ maxWidth: 90 }}
           />
           <button className="btn secondary small" onClick={addItem}>
             Add
