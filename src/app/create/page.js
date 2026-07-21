@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 const EMOJIS = ["🍲", "🎉", "🍂", "🎄", "🌻", "🏖️", "🍁", "🎃", "🥧", "🍕", "🎂", "⭐"];
 const COLORS = ["#e07a3f", "#3f7de0", "#4caf6b", "#c2447b", "#7a5cd6", "#d6a33f"];
 
-const DEFAULT_ITEMS = ["Main dish", "Side dish", "Dessert", "Drinks", "Plates & napkins"];
+const DEFAULT_ITEMS = ["Main dish", "Side dish", "Dessert", "Drinks", "Plates & napkins"].map((name) => ({
+  name,
+  neededQty: "",
+}));
 
 export default function CreatePage() {
   const router = useRouter();
@@ -30,13 +33,17 @@ export default function CreatePage() {
   function addItem() {
     const v = newItem.trim();
     if (!v) return;
-    setItems([...items, v]);
+    setItems([...items, { name: v, neededQty: "" }]);
     setNewItem("");
-}
+  }
 
   function removeItem(i) {
     setItems(items.filter((_, idx) => idx !== i));
-}
+  }
+
+  function setItemQty(i, value) {
+    setItems(items.map((it, idx) => (idx === i ? { ...it, neededQty: value } : it)));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -44,7 +51,7 @@ export default function CreatePage() {
     if (!title || !hostName || !hostEmail || !eventDate) {
       setError("Please fill in the event name, your name, your email, and the date.");
       return;
-}
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/events", {
@@ -64,22 +71,22 @@ export default function CreatePage() {
           items,
           reminderStartDays: reminderStartDays === "" ? null : Number(reminderStartDays),
           reminderRepeatDays: reminderRepeatDays === "" ? null : Number(reminderRepeatDays),
-}),
-});
+        }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       router.push(`/admin/${data.slug}?token=${data.adminToken}&new=1`);
-} catch (err) {
+    } catch (err) {
       setError(err.message);
       setLoading(false);
-}
-}
+    }
+  }
 
   return (
     <div className="wrap">
       <h1>Create a potluck</h1>
       <p className="subtitle">Fill in the details, then share the link with your guests.</p>
-{error && <div className="error-box">{error}</div>}
+      {error && <div className="error-box">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="card">
           <label>Event name *</label>
@@ -98,7 +105,12 @@ export default function CreatePage() {
             </div>
             <div>
               <label>Time</label>
-              <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
+              <input
+                type="text"
+                value={eventTime}
+                onChange={(e) => setEventTime(e.target.value)}
+                placeholder="e.g. 5:30 PM"
+              />
             </div>
           </div>
 
@@ -110,7 +122,7 @@ export default function CreatePage() {
           <div className="section-title">Look & feel</div>
           <label>Icon</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-{EMOJIS.map((e) => (
+            {EMOJIS.map((e) => (
               <button
                 type="button"
                 key={e}
@@ -122,15 +134,15 @@ export default function CreatePage() {
                   border: emoji === e ? "2px solid #333" : "1px solid #ece2d4",
                   background: "#fff",
                   cursor: "pointer",
-}}
+                }}
               >
-{e}
+                {e}
               </button>
             ))}
           </div>
           <label>Accent color</label>
           <div style={{ display: "flex", gap: 8 }}>
-{COLORS.map((c) => (
+            {COLORS.map((c) => (
               <button
                 type="button"
                 key={c}
@@ -142,7 +154,7 @@ export default function CreatePage() {
                   background: c,
                   border: color === c ? "3px solid #333" : "1px solid #ddd",
                   cursor: "pointer",
-}}
+                }}
               />
             ))}
           </div>
@@ -150,13 +162,26 @@ export default function CreatePage() {
 
         <div className="card">
           <div className="section-title">Items to bring</div>
-          <p className="helper">Guests will be able to sign up for these, or add their own.</p>
-{items.map((it, i) => (
+          <p className="helper">
+            Guests will be able to sign up for these, or add their own. Set "needed" if you want an item to
+            grey out once enough people have claimed it — leave blank for no limit.
+          </p>
+          {items.map((it, i) => (
             <div key={i} className="item-row">
-              <span className="item-name">{it}</span>
-              <button type="button" className="btn small danger" onClick={() => removeItem(i)}>
-                Remove
-              </button>
+              <span className="item-name">{it.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="number"
+                  min="1"
+                  value={it.neededQty}
+                  onChange={(e) => setItemQty(i, e.target.value)}
+                  placeholder="Needed"
+                  style={{ width: 80 }}
+                />
+                <button type="button" className="btn small danger" onClick={() => removeItem(i)}>
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
           <div className="row" style={{ marginTop: 10 }}>
@@ -206,7 +231,7 @@ export default function CreatePage() {
         </div>
 
         <button className="btn" type="submit" disabled={loading} style={{ width: "100%" }}>
-{loading ? "Creating..." : "Create my potluck page"}
+          {loading ? "Creating..." : "Create my potluck page"}
         </button>
       </form>
     </div>
