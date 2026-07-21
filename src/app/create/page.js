@@ -140,6 +140,19 @@ export default function CreatePage() {
               </button>
             ))}
           </div>
+          <label>Or type/paste any emoji</label>
+          <input
+            type="text"
+            value={emoji}
+            onChange={(e) => setEmoji(e.target.value.slice(0, 32))}
+            placeholder="🍕"
+            style={{ maxWidth: 90, fontSize: 22, textAlign: "center" }}
+          />
+          <p className="helper">
+            Click the box above and press Cmd+Ctrl+Space (Mac) or Win+. (Windows) to open your device's
+            emoji picker, or just paste any emoji.
+          </p>
+
           <label>Accent color</label>
           <div style={{ display: "flex", gap: 8 }}>
             {COLORS.map((c) => (
