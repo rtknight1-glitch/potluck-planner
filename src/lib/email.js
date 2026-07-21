@@ -8,6 +8,17 @@ function client() {
 
 const FROM = process.env.EMAIL_FROM || "Potluck Planner <onboarding@resend.dev>";
 
+// The Resend SDK resolves (doesn't throw) even when the API rejects a send —
+// the failure shows up as `result.error` instead. Log it here so silent
+// per-recipient failures (rate limits, sandbox restrictions, bad address,
+// etc.) actually show up in the Vercel function logs instead of vanishing.
+function logIfFailed(label, result) {
+  if (result && result.error) {
+    console.error(`[email] ${label} failed:`, JSON.stringify(result.error));
+  }
+  return result;
+}
+
 export async function sendHostSignupNotification({ event, item, signup }) {
   const resend = client();
   if (!resend) return { skipped: true };
@@ -16,7 +27,7 @@ export async function sendHostSignupNotification({ event, item, signup }) {
     ? `${signup.quantity}x ${item.name}`
     : `${signup.quantity}x (custom item)`;
 
-  return resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: event.host_email,
     subject: `New sign-up for ${event.title}: ${signup.guest_name}`,
@@ -25,6 +36,7 @@ export async function sendHostSignupNotification({ event, item, signup }) {
       (signup.note ? `Note: ${signup.note}\n` : "") +
       `\nView all sign-ups: ${process.env.NEXT_PUBLIC_SITE_URL}/admin/${event.slug}?token=${event.admin_token}`,
   });
+  return logIfFailed(`sendHostSignupNotification (to ${event.host_email})`, result);
 }
 
 export async function sendEventCreatedEmail({ event }) {
@@ -34,7 +46,7 @@ export async function sendEventCreatedEmail({ event }) {
   const publicUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/e/${event.slug}`;
   const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/admin/${event.slug}?token=${event.admin_token}`;
 
-  return resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: event.host_email,
     subject: `Your potluck "${event.title}" is ready`,
@@ -43,6 +55,7 @@ export async function sendEventCreatedEmail({ event }) {
       `Share this link with guests: ${publicUrl}\n\n` +
       `Your private admin link (bookmark this, it's how you manage the event): ${adminUrl}\n`,
   });
+  return logIfFailed(`sendEventCreatedEmail (to ${event.host_email})`, result);
 }
 
 export async function sendGuestSignupConfirmation({ event, item, signup }) {
@@ -56,7 +69,7 @@ export async function sendGuestSignupConfirmation({ event, item, signup }) {
     ? `${signup.quantity}x ${item.name}`
     : `${signup.quantity}x ${signup.custom_item_name || "something"}`;
 
-  return resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: signup.guest_email,
     subject: `You're confirmed for ${event.title}`,
@@ -71,6 +84,7 @@ export async function sendGuestSignupConfirmation({ event, item, signup }) {
       (event.location ? `Where: ${event.location}\n` : "") +
       `\nSee the full list or change your sign-up anytime: ${publicUrl}\n`,
   });
+  return logIfFailed(`sendGuestSignupConfirmation (to ${signup.guest_email})`, result);
 }
 
 export async function sendReminderEmail({ event, guestName, guestEmail }) {
@@ -80,7 +94,7 @@ export async function sendReminderEmail({ event, guestName, guestEmail }) {
   const publicUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/e/${event.slug}`;
   const when = [event.event_date, event.event_time].filter(Boolean).join(" ");
 
-  return resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: guestEmail,
     subject: `Reminder: ${event.title} is coming up`,
@@ -90,4 +104,5 @@ export async function sendReminderEmail({ event, guestName, guestEmail }) {
       `${event.location ? ` at ${event.location}` : ""}.\n\n` +
       `See what's still needed or update your sign-up: ${publicUrl}\n`,
   });
+  return logIfFailed(`sendReminderEmail (to ${guestEmail})`, result);
 }
