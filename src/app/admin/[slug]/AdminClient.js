@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const EMOJIS = ["🍲", "🎉", "🍂", "🎄", "🌻", "🏖️", "🍁", "🎃", "🥧", "🍕", "🎂", "⭐"];
+const COLORS = ["#e07a3f", "#3f7de0", "#4caf6b", "#c2447b", "#7a5cd6", "#d6a33f"];
+
 export default function AdminClient({ event, items, signups, token, isNew }) {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -12,6 +15,8 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
     event_time: event.event_time || "",
     location: event.location || "",
     theme: event.theme || "",
+    banner_emoji: event.banner_emoji || "🍲",
+    primary_color: event.primary_color || "#e07a3f",
     reminder_start_days: event.reminder_start_days ?? 7,
     reminder_repeat_days: event.reminder_repeat_days ?? "",
   });
@@ -165,6 +170,61 @@ export default function AdminClient({ event, items, signups, token, isNew }) {
 
         <label>Location</label>
         <input type="text" value={form.location} onChange={(e) => set("location", e.target.value)} />
+      </div>
+
+      <div className="section-title">Look & feel</div>
+      <div className="card">
+        <label>Icon</label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {EMOJIS.map((e) => (
+            <button
+              type="button"
+              key={e}
+              onClick={() => set("banner_emoji", e)}
+              style={{
+                fontSize: 22,
+                padding: 6,
+                borderRadius: 8,
+                border: form.banner_emoji === e ? "2px solid #333" : "1px solid #ece2d4",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        <label>Or type/paste any emoji</label>
+        <input
+          type="text"
+          value={form.banner_emoji}
+          onChange={(e) => set("banner_emoji", e.target.value.slice(0, 32))}
+          placeholder="🍕"
+          style={{ maxWidth: 90, fontSize: 22, textAlign: "center" }}
+        />
+        <p className="helper">
+          Click the box above and press Cmd+Ctrl+Space (Mac) or Win+. (Windows) to open your device's
+          emoji picker, or just paste any emoji.
+        </p>
+
+        <label>Accent color</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {COLORS.map((c) => (
+            <button
+              type="button"
+              key={c}
+              onClick={() => set("primary_color", c)}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: c,
+                border: form.primary_color === c ? "3px solid #333" : "1px solid #ddd",
+                cursor: "pointer",
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="section-title">Guest reminders</div>
