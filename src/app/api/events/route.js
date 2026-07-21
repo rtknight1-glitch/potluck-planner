@@ -79,7 +79,13 @@ export async function POST(req) {
   }
 
   // Awaited so Vercel doesn't freeze the function before the send completes.
-  await sendEventCreatedEmail({ event }).catch(() => {});
+  // Sends the host their "event is ready" email with the public link (to
+  // share with guests) and their private admin link (to manage the event).
+  try {
+    await sendEventCreatedEmail({ event });
+  } catch (e) {
+    console.error("[email] sendEventCreatedEmail threw:", e);
+  }
 
   return NextResponse.json({ slug: event.slug, adminToken: event.admin_token });
 }
