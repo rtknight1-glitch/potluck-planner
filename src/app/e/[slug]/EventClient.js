@@ -10,14 +10,6 @@ function formatDate(dateStr) {
   return dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const [h, m] = timeStr.split(":").map(Number);
-  const dt = new Date();
-  dt.setHours(h, m);
-  return dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 export default function EventClient({ event, items, signups }) {
   const router = useRouter();
   const [guestName, setGuestName] = useState("");
@@ -39,6 +31,16 @@ export default function EventClient({ event, items, signups }) {
       customSignups.push(s);
     }
   }
+
+  const itemsWithMeta = items.map((item) => {
+    const claims = signupsByItem[item.id] || [];
+    const totalQty = claims.reduce((sum, s) => sum + (s.quantity || 1), 0);
+    const fulfilled = item.needed_qty != null && totalQty >= item.needed_qty;
+    return { item, claims, totalQty, fulfilled };
+  });
+  const sortedItems = [...itemsWithMeta].sort((a, b) =>
+    a.fulfilled === b.fulfilled ? 0 : a.fulfilled ? 1 : -1
+  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -68,7 +70,7 @@ export default function EventClient({ event, items, signups }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
-      setSuccess("You're signed up! Thanks for bringing something.");
+      setSuccess("You're signed up! Thanks for bringing something. Check your email for a confirmation if you left one.");
       setGuestName("");
       setGuestEmail("");
       setCustomItem("");
@@ -90,62 +92,51 @@ export default function EventClient({ event, items, signups }) {
 
   return (
     <div className="wrap" style={{ "--primary": event.primary_color }}>
-      <div className="banner">{event.banner_emoji}</div>
-      <h1>{event.title}</h1>
-      {event.theme && <p className="subtitle">Theme: {event.theme}</p>}
-      {event.description && <p className="subtitle">{event.description}</p>}
-
-      <div className="details-grid">
-        <div>
-          <div className="label">Date</div>
-          <div className="value">{formatDate(event.event_date)}</div>
-        </div>
-        {event.event_time && (
-          <div>
-            <div className="label">Time</div>
-            <div className="value">{formatTime(event.event_time)}</div>
-          </div>
-        )}
-        {event.location && (
-          <div>
-            <div className="label">Location</div>
-            <div className="value">{event.location}</div>
-          </div>
-        )}
-        <div>
-          <div className="label">Host</div>
-          <div className="value">{event.host_name}</div>
+      <div className="hero-card">
+        <div className="hero-banner">{event.banner_emoji}</div>
+        <h1>{event.title}</h1>
+        {event.theme && <p className="subtitle">Theme: {event.theme}</p>}
+        {event.description && <p className="subtitle">{event.description}</p>}
+        <div className="hero-pills">
+          <span className="pill">📅 {formatDate(event.event_date)}</span>
+          {event.event_time && <span className="pill">⏰ {event.event_time}</span>}
+          {event.location && <span className="pill">📍 {event.location}</span>}
+          <span className="pill">🙋 {event.host_name}</span>
         </div>
       </div>
 
       <div className="section-title">What to bring</div>
-      <div className="card">
-        {items.map((item) => (
-          <div key={item.id} className="item-row">
-            <div>
-              <div className="item-name">{item.name}</div>
-              {(signupsByItem[item.id] || []).map((s) => (
-                <span key={s.id} className="claim">
+      {sortedItems.map(({ item, claims, totalQty, fulfilled }) => (
+        <div key={item.id} className={`item-card${fulfilled ? " fulfilled" : ""}`}>
+          <div>
+            <div className="item-card-name">{item.name}</div>
+            <div className="item-card-claims">
+              {claims.map((s) => (
+                <span key={s.id} className="claim-chip">
                   {s.guest_name} ({s.quantity}x)
                 </span>
               ))}
-              {!(signupsByItem[item.id] || []).length && (
-                <div className="item-need">No one signed up yet</div>
-              )}
+              {!claims.length && <span className="helper">No one signed up yet</span>}
             </div>
           </div>
-        ))}
-        {customSignups.map((s) => (
-          <div key={s.id} className="item-row">
-            <div>
-              <div className="item-name">{s.custom_item_name || "Other item"}</div>
-              <span className="claim">
+          <span className={`qty-badge${fulfilled ? " fulfilled-badge" : ""}`}>
+            {totalQty}
+            {item.needed_qty ? `/${item.needed_qty}` : ""}
+          </span>
+        </div>
+      ))}
+      {customSignups.map((s) => (
+        <div key={s.id} className="item-card">
+          <div>
+            <div className="item-card-name">{s.custom_item_name || "Other item"}</div>
+            <div className="item-card-claims">
+              <span className="claim-chip">
                 {s.guest_name} ({s.quantity}x)
               </span>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
       <div className="section-title">Sign up</div>
       {error && <div className="error-box">{error}</div>}
@@ -157,7 +148,7 @@ export default function EventClient({ event, items, signups }) {
             <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
           </div>
           <div>
-            <label>Email (for reminders, optional)</label>
+            <label>Email (for reminders + confirmation, optional)</label>
             <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
           </div>
         </div>
